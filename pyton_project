@@ -1,0 +1,119 @@
+import sqlite3
+
+def display_menu():
+    with sqlite3.connect('materials.db') as conn:
+        cursor = conn.cursor()
+
+        # Create the materials table if it doesn't exist
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS materials (
+            id INTEGER PRIMARY KEY,
+            material_code TEXT NOT NULL,
+            description TEXT NOT NULL,
+            quantity INTEGER NOT NULL
+        )
+        ''')
+
+        # List of materials with code, description, and quantity
+        materials = [
+            ("105155", "Shaft gears", 51),
+            ("105158", "DEFLECTOR FOR ADP122", 80),
+            ("A111242S", "DRIVING SHAFT ADP122", 28),
+            ("A111243S", "DRIVEN SHAFT ADP122", 23),
+            ("A112418", "PLATE LP2 AND LP3 BF122/124", 43),
+            ("A604269", "LP SUPPORT FB122-124 ACC", 31),
+            ("A111908", "COOLING HP PLATE 124-203HT-204H&X", 9),
+            ("A332794", "HP BEARING FLANGE A203H", 14),
+            ("A108117S", "MOT.PART.THRE 1500W 200/240V 50/60", 22),
+            ("105161", "DRIVING PLATE ADP122", 36)
+        ]
+
+        # Clear the table before inserting new materials
+        cursor.execute('DELETE FROM materials')
+        conn.commit()
+
+        # Insert materials into the table
+        cursor.executemany('''
+        INSERT INTO materials (material_code, description, quantity)
+        VALUES (?, ?, ?)
+        ''', materials)
+        conn.commit()
+
+        while True:
+            print("Menu:")
+            print("1. Show stocks")
+            print("2. Receive materials")
+            print("3. Use materials")
+            print("4. Add new material")
+            print("5. Exit")
+
+            choice = input("Enter your choice (1-5): ")
+
+            if choice == '1':
+                show_stocks(cursor)
+            elif choice == '2':
+                receive_materials(cursor, conn)
+            elif choice == '3':
+                use_materials(cursor, conn)
+            elif choice == '4':
+                add_new_material(cursor, conn)
+            elif choice == '5':
+                print("Exiting the menu.")
+                break
+            else:
+                print("Invalid choice. Please enter a number between 1 and 5.")
+
+def show_stocks(cursor):
+    cursor.execute("SELECT * FROM materials")
+    rows = cursor.fetchall()
+    for row in rows:
+        print(row)
+
+def get_valid_item_code(cursor):
+    while True:
+        item_code_to_check = input("Enter material code: ")
+        cursor.execute("SELECT quantity FROM materials WHERE material_code = ?", (item_code_to_check,))
+        stock = cursor.fetchone()
+        if stock is not None:
+            return item_code_to_check
+        else:
+            print("Material code does not exist. Please try again.")
+
+def receive_materials(cursor, conn):
+    material_code = get_valid_item_code(cursor)
+    quantity = int(input("Enter quantity received: "))
+    cursor.execute("UPDATE materials SET quantity = quantity + ? WHERE material_code = ?", (quantity, material_code))
+    conn.commit()
+    print("Materials received successfully.")
+
+def use_materials(cursor, conn):
+    material_code = get_valid_item_code(cursor)
+    quantity = int(input("Enter quantity used: "))
+    cursor.execute("SELECT quantity FROM materials WHERE material_code = ?", (material_code,))
+    available_quantity = cursor.fetchone()[0]
+    if quantity <= available_quantity:
+        cursor.execute("UPDATE materials SET quantity = quantity - ? WHERE material_code = ?", (quantity, material_code))
+        conn.commit()
+        print("Materials used successfully.")
+    else:
+        print(f"Insufficient stock. Available quantity: {available_quantity}")
+
+def add_new_material(cursor, conn):
+    while True:
+        material_code = input("Enter new material code: ")
+        if validate_material_code(material_code):
+            break
+        else:
+            print("Invalid material code format. Please try again.")
+    description = input("Enter material description: ")
+    quantity = int(input("Enter quantity: "))
+    cursor.execute("INSERT INTO materials (material_code, description, quantity) VALUES (?, ?, ?)", (material_code, description, quantity))
+    conn.commit()
+    print("New material added successfully.")
+
+def validate_material_code(material_code):
+    # Example validation: material code must be alphanumeric and between 6 to 10 characters
+    return material_code.isalnum() and 6 <= len(material_code) <= 10
+
+# Call the function to display the menu
+display_menu()
